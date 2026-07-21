@@ -1,25 +1,29 @@
 # ResumeTailor AI
 
-An AI-powered resume optimization app built with Flutter that helps job seekers tailor their resumes for ATS (Applicant Tracking Systems) by matching keywords from job descriptions.
+An AI-powered resume optimization app built with Flutter. Upload your resume and a job description to get an ATS-friendly version tailored to the role.
 
 ---
 
 ## Screenshots
 
-| Home | Input | Result | Result |
-|------|-------|--------|--------|
-| ![Home Screen](screenshots/home.png) | ![Input Screen](screenshots/input.png) | ![Input Screen](screenshots/optimize.png) | ![Result Screen](screenshots/result.png) |
+| Splash | Home | Input |
+|--------|------|-------|
+| ![Splash](screenshots/splash.png) | ![Home](screenshots/home.png) | ![Input](screenshots/input.png) |
+
+| Optimizing | Result | Compare |
+|------------|--------|---------|
+| ![Optimizing](screenshots/optimizing.png) | ![Result](screenshots/result.png) | ![Compare](screenshots/compare.png) |
 
 ---
 
 ## Features
 
-- **AI-Powered Optimization** — Uses Groq AI (LLaMA 3.3 70B) to intelligently optimize your resume
+- **AI-Powered Optimization** — Uses Groq AI (LLaMA 3.3 70B) to tailor your resume to a job description
 - **PDF/DOCX Import** — Upload resumes with on-device OCR fallback for scanned PDFs
-- **ATS-Friendly** — Matches keywords from job descriptions to increase ATS pass rate
-- **Compare Diff** — See original vs optimized side-by-side changes
+- **ATS Keyword Matching** — Aligns skills and wording with the job posting
+- **Compare Diff** — Review original vs optimized changes side by side
 - **History** — Save and reopen past optimizations locally
-- **PDF Export** — Export optimized resume as a multi-page PDF
+- **PDF Export** — Export the optimized resume as a multi-page PDF
 - **Android + iOS** — Cross-platform with RT AI branding and splash screen
 
 ---
@@ -28,10 +32,11 @@ An AI-powered resume optimization app built with Flutter that helps job seekers 
 
 - **Framework** — Flutter / Dart
 - **AI Model** — LLaMA 3.3 70B via Groq Cloud API
-- **HTTP** — `http` package
+- **HTTP** — `http`
 - **Environment** — `flutter_dotenv`
-- **PDF Export** — `pdf` + `printing` packages
+- **PDF Export** — `pdf` + `printing`
 - **OCR** — Google ML Kit (on-device)
+- **History** — `shared_preferences`
 
 ---
 
@@ -40,7 +45,7 @@ An AI-powered resume optimization app built with Flutter that helps job seekers 
 ### Prerequisites
 
 - Flutter SDK `^3.8.1`
-- Groq API Key — Get one free at [console.groq.com](https://console.groq.com)
+- Groq API Key — free at [console.groq.com](https://console.groq.com)
 
 ### Installation
 
@@ -55,7 +60,7 @@ An AI-powered resume optimization app built with Flutter that helps job seekers 
    flutter pub get
    ```
 
-3. **Create `.env` file** in the root directory
+3. **Create `.env` file** in the project root
    ```
    GROQ_API_KEY=your_groq_api_key_here
    ```
@@ -102,10 +107,10 @@ lib/
 ## How It Works
 
 1. Upload a PDF/DOCX resume (or paste text)
-2. Paste the job description you're applying for
-3. Hit **Optimize with AI**
-4. Review Optimized / Compare / Original tabs
-5. Copy or export as PDF
+2. Paste the job description for the role you want
+3. Tap **Optimize with AI**
+4. Review **Optimized**, **Compare**, and **Original** tabs
+5. Copy the text or export as PDF
 
 ---
 
