@@ -1,46 +1,85 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../models/optimization_record.dart';
+import '../services/diff_service.dart';
+import '../services/pdf_export_service.dart';
+import '../services/resume_formatter.dart';
 import '../theme/app_theme.dart';
+import '../widgets/action_chip_button.dart';
+import '../widgets/app_card.dart';
 
 class ResultScreen extends StatefulWidget {
   final String result;
+  final String originalResume;
+  final String jobDescription;
 
-  const ResultScreen({super.key, required this.result});
+  const ResultScreen({
+    super.key,
+    required this.result,
+    required this.originalResume,
+    this.jobDescription = '',
+  });
+
+  factory ResultScreen.fromRecord(OptimizationRecord record) {
+    return ResultScreen(
+      result: record.optimized,
+      originalResume: record.original,
+      jobDescription: record.jobDescription,
+    );
+  }
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
 }
 
-class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
+class _ResultScreenState extends State<ResultScreen>
+    with SingleTickerProviderStateMixin {
   bool _copied = false;
+  bool _isExporting = false;
+  late TabController _tabController;
+  final _pdfExport = PdfExportService();
+  final _diffService = DiffService();
 
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    )..forward();
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOut,
-    );
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
   void dispose() {
-    _fadeController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
-  void _copyToClipboard() async {
-    await Clipboard.setData(ClipboardData(text: widget.result));
+  Future<void> _copyToClipboard() async {
+    final text = _tabController.index == 2
+        ? widget.originalResume
+        : widget.result;
+    await Clipboard.setData(ClipboardData(text: text));
     setState(() => _copied = true);
     await Future.delayed(const Duration(seconds: 2));
     if (mounted) setState(() => _copied = false);
+  }
+
+  Future<void> _exportPdf() async {
+    setState(() => _isExporting = true);
+    try {
+      await _pdfExport.exportResume(widget.result);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: ${e.toString()}'),
+            backgroundColor: AppColors.surfaceElevated,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
   }
 
   @override
@@ -48,175 +87,144 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: Column(
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceElevated,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.surfaceBorder),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: AppColors.textSecondary,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Optimized Resume',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          'Step 2 of 2 — Result',
-                          style: TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    // Done badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: AppColors.accent.withOpacity(0.3),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check_rounded, color: AppColors.accent, size: 12),
-                          SizedBox(width: 4),
-                          Text(
-                            'Done',
-                            style: TextStyle(
-                              color: AppColors.accent,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              Container(height: 1, color: AppColors.surfaceBorder),
-
-              // Action chips row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                child: Row(
-                  children: [
-                    _ActionChip(
-                      icon: _copied ? Icons.check_rounded : Icons.copy_rounded,
-                      label: _copied ? 'Copied!' : 'Copy Text',
-                      accent: _copied ? AppColors.accent : null,
-                      onTap: _copyToClipboard,
-                    ),
-                    const SizedBox(width: 10),
-                    _ActionChip(
-                      icon: Icons.refresh_rounded,
-                      label: 'Start Over',
-                      onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Success info card
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.accent.withOpacity(0.08),
-                        AppColors.gradientEnd.withOpacity(0.05),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.accent.withOpacity(0.2),
-                    ),
+        child: Column(
+          children: [
+            ScreenHeader(
+              title: 'Optimized Resume',
+              subtitle: 'Step 2 — Review & export',
+              onBack: () => Navigator.pop(context),
+            ),
+            const Divider(height: 1, color: AppColors.surfaceBorder),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  ActionChipButton(
+                    icon: _copied ? Icons.check_rounded : Icons.copy_rounded,
+                    label: _copied ? 'Copied' : 'Copy',
+                    highlighted: _copied,
+                    onTap: _copyToClipboard,
                   ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.auto_fix_high_rounded, color: AppColors.accent, size: 16),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Your resume has been optimized for ATS keyword matching.',
-                          style: TextStyle(
-                            color: AppColors.accent,
-                            fontSize: 12,
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
-                    ],
+                  ActionChipButton(
+                    icon: Icons.picture_as_pdf_outlined,
+                    label: _isExporting ? 'Exporting...' : 'Export PDF',
+                    onTap: _isExporting ? () {} : _exportPdf,
                   ),
-                ),
+                  ActionChipButton(
+                    icon: Icons.refresh_rounded,
+                    label: 'Start Over',
+                    onTap: () =>
+                        Navigator.popUntil(context, (route) => route.isFirst),
+                  ),
+                ],
               ),
-
-              const SizedBox(height: 16),
-
-              // Result content
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceElevated,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.surfaceBorder),
-                    ),
-                    child: SingleChildScrollView(
-                      child: SelectableText(
+            ),
+            TabBar(
+              controller: _tabController,
+              labelColor: AppColors.accent,
+              unselectedLabelColor: AppColors.textMuted,
+              indicatorColor: AppColors.accent,
+              tabs: const [
+                Tab(text: 'Optimized'),
+                Tab(text: 'Compare'),
+                Tab(text: 'Original'),
+              ],
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _OptimizedView(text: widget.result),
+                    _CompareView(
+                      segments: _diffService.compare(
+                        widget.originalResume,
                         widget.result,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 13.5,
-                          height: 1.75,
-                          fontFamily: 'monospace',
-                          letterSpacing: 0.1,
-                        ),
                       ),
                     ),
-                  ),
+                    _PlainTextView(text: widget.originalResume),
+                  ],
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-              const SizedBox(height: 24),
+class _OptimizedView extends StatelessWidget {
+  final String text;
+
+  const _OptimizedView({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = ResumeFormatter.parseSections(text);
+
+    if (sections.length <= 1 && sections.first.title == 'RESUME') {
+      return _PlainTextView(text: text);
+    }
+
+    return AppCard(
+      padding: const EdgeInsets.all(20),
+      child: ListView.separated(
+        itemCount: sections.length,
+        separatorBuilder: (_, __) => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Divider(color: AppColors.surfaceBorder),
+        ),
+        itemBuilder: (context, index) {
+          final section = sections[index];
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                section.title,
+                style: GoogleFonts.inter(
+                  color: AppColors.accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SelectableText(
+                section.content,
+                style: GoogleFonts.inter(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  height: 1.7,
+                ),
+              ),
             ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PlainTextView extends StatelessWidget {
+  final String text;
+
+  const _PlainTextView({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(20),
+      child: SingleChildScrollView(
+        child: SelectableText(
+          text,
+          style: GoogleFonts.inter(
+            color: AppColors.textPrimary,
+            fontSize: 14,
+            height: 1.7,
           ),
         ),
       ),
@@ -224,68 +232,38 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
   }
 }
 
-class _ActionChip extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color? accent;
+class _CompareView extends StatelessWidget {
+  final List<DiffSegment> segments;
 
-  const _ActionChip({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.accent,
-  });
-
-  @override
-  State<_ActionChip> createState() => _ActionChipState();
-}
-
-class _ActionChipState extends State<_ActionChip> {
-  bool _pressed = false;
+  const _CompareView({required this.segments});
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.accent ?? AppColors.textSecondary;
-
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.95 : 1.0,
-        duration: const Duration(milliseconds: 80),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: widget.accent != null
-                ? widget.accent!.withOpacity(0.1)
-                : AppColors.surfaceElevated,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: widget.accent != null
-                  ? widget.accent!.withOpacity(0.4)
-                  : AppColors.surfaceBorder,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(widget.icon, size: 14, color: color),
-              const SizedBox(width: 7),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+    return AppCard(
+      padding: const EdgeInsets.all(20),
+      child: SingleChildScrollView(
+        child: SelectableText.rich(
+          TextSpan(
+            children: segments.map((segment) {
+              return TextSpan(
+                text: segment.text,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  height: 1.7,
+                  color: switch (segment.type) {
+                    DiffSegmentType.insert => AppColors.success,
+                    DiffSegmentType.delete => AppColors.textMuted,
+                    DiffSegmentType.equal => AppColors.textSecondary,
+                  },
+                  decoration: segment.type == DiffSegmentType.delete
+                      ? TextDecoration.lineThrough
+                      : null,
+                  fontWeight: segment.type == DiffSegmentType.insert
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                 ),
-              ),
-            ],
+              );
+            }).toList(),
           ),
         ),
       ),
